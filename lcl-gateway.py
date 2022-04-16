@@ -59,17 +59,17 @@ if __name__ == "__main__":
 
                     t = timestamp
                     #t = timestamp + '000000000'
-                    url = c.get(sect, 'url')
-                    db = c.get(sect, 'db')
-                    org = c.get(sect, 'org')
-                    bucket = c.get(sect, 'bucket')
-                    token = c.get(sect, 'token')
                     version = c.get(sect, 'version')
+                    url = c.get(sect, 'url')
                     measurement = c.get(sect, 'measurement')
                     if version =='2':
+                        org = c.get(sect, 'org')
+                        bucket = c.get(sect, 'bucket')
+                        token = c.get(sect, 'token')
                         headers = {'Authorization': 'Token %s' % (token)}
                         params = {"org":org,"bucket": bucket,"precision":"s"}
                     else:
+                        db = c.get(sect, 'db')
                         headers = {}
                         params = {'db':db, 'precision':'s'}
 
@@ -79,7 +79,6 @@ if __name__ == "__main__":
                         i += 1
                         if zz!="":
                             payload += "%s,channel=%02d value=%s %s\n" % (measurement, i, zz,t)
-                            #payload = "rpict3t1,channel=01 value=50.2 %s\nrpict3t1,channel=02 value=156.2 %s\n" % (t,t)
                     if options.debug: print(payload)
                     if version=='2':
                         r = requests.post(url, headers=headers, params=params, data=payload)
