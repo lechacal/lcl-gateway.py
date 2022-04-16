@@ -13,6 +13,7 @@ import configparser
 import serial
 import requests
 
+
 if __name__ == "__main__":
     logging.basicConfig(format='%(levelname)s: %(message)s', level=logging.INFO)
 
@@ -101,12 +102,13 @@ if __name__ == "__main__":
                     ls_dir = c.get(sect, 'directory')
                     filename = ls_dir+'/'+timestamp+'.csv'
                     if not ls_fileopen:
-                        f = open(filename,'w')
+                        f = open(filename, 'wt')
                         ls_fileopen = True
                     if DayOfMonth != utcnow.day:
                         DayOfMonth = utcnow.day
-                        if ls_fileopen: f.close()
-                        f = open(filename,'w')
+                        if ls_fileopen:
+                            f.close()
+                        f = open(filename, 'wt')
                         ls_fileopen = True
 
                     f.write(timestamp+','+csv+'\n')
