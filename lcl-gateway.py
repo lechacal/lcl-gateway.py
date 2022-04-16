@@ -3,23 +3,29 @@
 # LCL GATEWAY
 # LECHACAL.COM
 
-import configparser
-import serial
 import os
 import sys
-import requests
+import logging
 import datetime
 import argparse
+import configparser
 
+import serial
+import requests
 
 if __name__ == "__main__":
+    logging.basicConfig(format='%(levelname)s: %(message)s', level=logging.INFO)
+
     parser = argparse.ArgumentParser(description='LeChacal Gateway')
     parser.add_argument('-c', '--config', dest='config', default='/etc/lcl-gateway.conf', action='store')
     parser.add_argument('-d', '--debug', dest='debug', default=False, action='store_true')
     args = parser.parse_args()
 
+    if args.debug:
+        logging.getLogger().setLevel(logging.DEBUG)
+
     if not os.access(args.config, os.R_OK):
-        print(f'Config file not found: {args.config}')
+        logging.error('Config file not found: %s', args.config)
         sys.exit(1)
 
     c = configparser.ConfigParser()
@@ -28,9 +34,10 @@ if __name__ == "__main__":
     baud = c.getint('system','baud')
     serial_port = c.get('system', 'port')
     if not os.path.exists(serial_port):
-        print('Serial port %s not found' % serial_port)
+        logging.error('Serial port %s not found', serial_port)
         sys.exit(1)
     ser = serial.Serial(serial_port, baud)
+    logging.info('Reading data from %s', serial_port)
 
     DayOfMonth = datetime.datetime.utcnow().day
     ls_fileopen = False
@@ -38,14 +45,14 @@ if __name__ == "__main__":
     while True:
         try:
             data_in = ser.readline()
+            logging.debug(data_in)
 
             utcnow = datetime.datetime.utcnow()
             timestamp = utcnow.strftime("%s")
 
-            if args.debug: print(data_in)
-
             z = data_in.decode('ascii').strip().split(' ')
             csv = ','.join(z[1:])
+
             for sect in c.sections():
                 if sect=='emoncms' and c.getboolean(sect,'enabled'):
                 #EMONCMS
@@ -53,10 +60,10 @@ if __name__ == "__main__":
                     node = c.get(sect, 'node')
                     apikey = c.get(sect, 'apikey')
                     url = "http://%s/input/post?apikey=%s&node=%s&csv=%s" % (hostname, apikey, node, csv)
-                    if args.debug: print(url)
+                    logging.debug(url)
                     r = requests.post(url)
                     #s = urllib2.urlopen(url)
-                    if args.debug: print(r)
+                    logging.debug(r)
 
                 if sect=='influxdb' and c.getboolean(sect,'enabled'):
                 #INFLUXDB
@@ -82,12 +89,12 @@ if __name__ == "__main__":
                         i += 1
                         if zz!="":
                             payload += "%s,channel=%02d value=%s %s\n" % (measurement, i, zz,t)
-                    if args.debug: print(payload)
+                    logging.debug(payload)
                     if version=='2':
                         r = requests.post(url, headers=headers, params=params, data=payload)
                     else:
                         r = requests.post(url, params=params, data=payload)
-                    if args.debug: print(r.text)
+                    logging.debug(r.text)
 
                 if sect=='localsave' and c.getboolean(sect,'enabled'):
                 # LOCALSAVE
@@ -106,6 +113,7 @@ if __name__ == "__main__":
 
 
         except KeyboardInterrupt:
-            if ls_fileopen: f.close()
-            print("Terminating.")
+            if ls_fileopen:
+                f.close()
+            logging.info("Terminating.")
             break
