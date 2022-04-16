@@ -1,12 +1,12 @@
-#!/usr/bin/python2
+#!/usr/bin/env python3
 #
 # LCL GATEWAY
-# VERSION 1.3
-# LECHACAL.COM 16 July 2021
+# LECHACAL.COM
 
-import ConfigParser
+import configparser
 import serial
-import os, sys
+import os
+import sys
 import requests
 import datetime
 import optparse
@@ -19,7 +19,7 @@ if __name__ == "__main__":
     parser.add_option('-d', '--debug', dest='debug', default=False, action='store_true',)
     options, remainder = parser.parse_args()
 
-    c = ConfigParser.ConfigParser()
+    c = configparser.ConfigParser()
     c.read("/etc/lcl-gateway.conf")
 
     baud = c.getint('system','baud')
@@ -41,10 +41,7 @@ if __name__ == "__main__":
 
             if options.debug: print(data_in)
 
-            while data_in[-1] in ['\r', '\n']:
-                data_in = data_in[:-1]
-            
-            z = data_in.split(' ')
+            z = data_in.decode('ascii').strip().split(' ')
             csv = ','.join(z[1:])
             for sect in c.sections():
                 if sect=='emoncms' and c.getboolean(sect,'enabled'):
