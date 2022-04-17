@@ -57,13 +57,12 @@ if __name__ == "__main__":
             for sect in c.sections():
                 if sect=='emoncms' and c.getboolean(sect,'enabled'):
                 #EMONCMS
-                    hostname = c.get(sect, 'hostname')
+                    url = c.get(sect, 'url')
                     node = c.get(sect, 'node')
                     apikey = c.get(sect, 'apikey')
-                    url = "http://%s/input/post?apikey=%s&node=%s&csv=%s" % (hostname, apikey, node, csv)
+                    url = "%s?apikey=%s&node=%s&csv=%s" % (url, apikey, node, csv)
                     logging.debug(url)
                     r = requests.post(url)
-                    #s = urllib2.urlopen(url)
                     logging.debug(r)
 
                 if sect=='influxdb' and c.getboolean(sect,'enabled'):
