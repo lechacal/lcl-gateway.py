@@ -82,8 +82,8 @@ if __name__ == "__main__":
     # significantly speeds up data submission to the backends
     session = requests.Session()
 
-    DayOfMonth = datetime.datetime.utcnow().day
-    ls_fileopen = False
+    # Rotate 'localsave' files every day
+    ls_day = None
 
     while True:
         try:
@@ -99,6 +99,9 @@ if __name__ == "__main__":
             data_in = map(float, data_in)
             data_in = dict(zip(channel_names, data_in))
 
+            # Filter data by the requested channels
+            data_out = { key: data_in[key] for key in data_in if key in channels }
+
             utcnow = datetime.datetime.utcnow()
             timestamp = utcnow.strftime("%s")
 
@@ -107,8 +110,6 @@ if __name__ == "__main__":
                 url = c.get('emoncms', 'url')
                 node = c.get('emoncms', 'node')
                 apikey = c.get('emoncms', 'apikey')
-
-                data_out = { key: data_in[key] for key in data_in if key in channels }
 
                 payload = {
                     "apikey": apikey,
@@ -148,26 +149,26 @@ if __name__ == "__main__":
 
             if 'localsave' in c.sections() and c.getboolean('localsave', 'enabled'):
             # LOCALSAVE
-                ls_dir = c.get('localsave', 'directory')
-                filename = ls_dir+'/'+timestamp+'.csv'
-                if not ls_fileopen:
-                    f = open(filename, 'wt')
-                    ls_fileopen = True
-                if DayOfMonth != utcnow.day:
-                    DayOfMonth = utcnow.day
-                    if ls_fileopen:
-                        f.close()
-                    f = open(filename, 'wt')
-                    ls_fileopen = True
+                if ls_day != utcnow.day:
+                    ls_day = utcnow.day
+                    ls_dir = c.get('localsave', 'directory')
+                    ls_filename = os.path.join(ls_dir, f"lcl-{timestamp}.csv")
+                    logging.debug("Localsave file: %s", ls_filename)
+                    write_header = True
 
-                f.write(timestamp+','+csv+'\n')
+                csv = ",".join(map(lambda x: str(x+1), data_out.values()))
+                with open(ls_filename, "at", encoding="ascii") as f:
+                    if write_header:
+                        csv_headers = ",".join(data_out.keys())
+                        f.write(f"timestamp,{csv_headers}\n")
+                        write_header = False
+
+                    f.write(f"{timestamp},{csv}\n")
 
             logging.debug("---")
 
 
         except KeyboardInterrupt:
-            if ls_fileopen:
-                f.close()
             logging.info("Terminating.")
             break
 
