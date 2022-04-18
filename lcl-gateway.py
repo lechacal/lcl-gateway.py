@@ -24,7 +24,12 @@ def post_to_url(session, *args, **kwargs):
         if not r.ok:
             logging.warning(r.text)
     except requests.exceptions.ConnectionError as e:
-        if e.args[0].args[0] == 'Connection aborted.':
+        connection_aborted = False
+        try:
+            connection_aborted = e.args[0].args[0] == 'Connection aborted.'
+        except:
+            pass
+        if connection_aborted:
             # emoncms.org doesn't like idle persistent connections
             # and aborts them from time to time
             logging.debug("Connection aborted - reconnecting")
@@ -54,7 +59,7 @@ if __name__ == "__main__":
     c.read(args.config)
 
     channel_names = c.get('system', 'channel_names')
-    channel_names = re.sub('\s', '', channel_names)
+    channel_names = re.sub('\\s', '', channel_names)
     channel_names = channel_names.split(',')
     logging.debug("Channel names: %s", channel_names)
 
@@ -62,7 +67,7 @@ if __name__ == "__main__":
     if channels == '*':
         channels = channel_names.keys()
     else:
-        channels = re.sub('\s', '', channels)
+        channels = re.sub('\\s', '', channels)
         channels = channels.split(',')
     logging.debug("Channels: %s", channels)
 
@@ -91,7 +96,7 @@ if __name__ == "__main__":
 
             # Parse the data - create a "dict" from channel names and the values
             data_in = data_in.decode('ascii').strip().split(' ')
-            data_in = map(lambda x: float(x), data_in)
+            data_in = map(float, data_in)
             data_in = dict(zip(channel_names, data_in))
 
             utcnow = datetime.datetime.utcnow()
@@ -125,7 +130,7 @@ if __name__ == "__main__":
                     org = c.get('influxdb', 'org')
                     bucket = c.get('influxdb', 'bucket')
                     token = c.get('influxdb', 'token')
-                    headers = {'Authorization': 'Token %s' % (token)}
+                    headers = {'Authorization': f'Token {token}'}
                     params = {"org":org,"bucket": bucket,"precision":"s"}
                 else:
                     db = c.get('influxdb', 'db')
@@ -134,8 +139,8 @@ if __name__ == "__main__":
 
                 logging.debug("URL: %s", url)
                 payload = []
-                for channel in channels:
-                    payload.append("%s,channel=%s value=%s %s" % (measurement, channel, data_in[channel], timestamp))
+                for channel in data_out:
+                    payload.append(f"{measurement},channel={channel} value={data_out[channel]} {timestamp}")
                 logging.debug("Payload: %s", payload)
                 payload_str = "\n".join(payload)
 
