@@ -5,6 +5,8 @@
 
 import os
 import sys
+import re
+import json
 import logging
 import datetime
 import argparse
@@ -13,6 +15,30 @@ import configparser
 import serial
 import requests
 
+HTTP_TIMEOUT=5
+
+def post_to_url(session, *args, **kwargs):
+    try:
+        r = session.post(*args, **kwargs, timeout=HTTP_TIMEOUT)
+        logging.debug("Result: %d %s", r.status_code, r.reason)
+        if not r.ok:
+            logging.warning(r.text)
+    except requests.exceptions.ConnectionError as e:
+        connection_aborted = False
+        try:
+            connection_aborted = e.args[0].args[0] == 'Connection aborted.'
+        except:
+            pass
+        if connection_aborted:
+            # emoncms.org doesn't like idle persistent connections
+            # and aborts them from time to time
+            logging.debug("Connection aborted - reconnecting")
+            r = session.post(*args, **kwargs, timeout=HTTP_TIMEOUT)
+            logging.debug("Result: %d %s", r.status_code, r.reason)
+            if not r.ok:
+                logging.warning(r.text)
+        else:
+            logging.warning("ConnectionError: %s", e)
 
 if __name__ == "__main__":
     logging.basicConfig(format='%(levelname)s: %(message)s', level=logging.INFO)
@@ -32,7 +58,19 @@ if __name__ == "__main__":
     c = configparser.ConfigParser()
     c.read(args.config)
 
-    baud = c.getint('system','baud')
+    channel_names = c.get('system', 'channel_names')
+    channel_names = re.sub('\\s', '', channel_names)
+    channel_names = channel_names.split(',')
+    logging.debug("Channel names: %s", channel_names)
+
+    channels = c.get('system', 'channels', fallback='*')
+    if channels == '*':
+        channels = channel_names.keys()
+    else:
+        channels = re.sub('\\s', '', channels)
+        channels = channels.split(',')
+    logging.debug("Channels: %s", channels)
+
     serial_port = c.get('system', 'port')
     if not os.path.exists(serial_port):
         logging.error('Serial port %s not found', serial_port)
@@ -40,82 +78,99 @@ if __name__ == "__main__":
     ser = serial.Serial(serial_port, baud)
     logging.info('Reading data from %s', serial_port)
 
-    DayOfMonth = datetime.datetime.utcnow().day
-    ls_fileopen = False
+    # Session provides a persistent connection support that
+    # significantly speeds up data submission to the backends
+    session = requests.Session()
+
+    # Rotate 'localsave' files every day
+    ls_day = None
 
     while True:
         try:
+            # Read one line from the source
             data_in = ser.readline()
-            logging.debug(data_in)
+            if not data_in:
+                logging.warning("End of file reached: %s", serial_port)
+                break
+            logging.debug("DataIn: %s", data_in)
+
+            # Parse the data - create a "dict" from channel names and the values
+            data_in = data_in.decode('ascii').strip().split(' ')
+            data_in = map(float, data_in)
+            data_in = dict(zip(channel_names, data_in))
+
+            # Filter data by the requested channels
+            data_out = { key: data_in[key] for key in data_in if key in channels }
 
             utcnow = datetime.datetime.utcnow()
             timestamp = utcnow.strftime("%s")
 
-            z = data_in.decode('ascii').strip().split(' ')
-            csv = ','.join(z[1:])
+            if 'emoncms' in c.sections() and c.getboolean('emoncms', 'enabled'):
+            #EMONCMS
+                url = c.get('emoncms', 'url')
+                node = c.get('emoncms', 'node')
+                apikey = c.get('emoncms', 'apikey')
 
-            for sect in c.sections():
-                if sect=='emoncms' and c.getboolean(sect,'enabled'):
-                #EMONCMS
-                    hostname = c.get(sect, 'hostname')
-                    node = c.get(sect, 'node')
-                    apikey = c.get(sect, 'apikey')
-                    url = "http://%s/input/post?apikey=%s&node=%s&csv=%s" % (hostname, apikey, node, csv)
-                    logging.debug(url)
-                    r = requests.post(url)
-                    #s = urllib2.urlopen(url)
-                    logging.debug(r)
+                payload = {
+                    "apikey": apikey,
+                    "node": node,
+                    "fulljson": json.dumps(data_out, separators=(',', ':')),
+                }
 
-                if sect=='influxdb' and c.getboolean(sect,'enabled'):
-                #INFLUXDB
-                    t = timestamp
-                    #t = timestamp + '000000000'
-                    version = c.get(sect, 'version')
-                    url = c.get(sect, 'url')
-                    measurement = c.get(sect, 'measurement')
-                    if version =='2':
-                        org = c.get(sect, 'org')
-                        bucket = c.get(sect, 'bucket')
-                        token = c.get(sect, 'token')
-                        headers = {'Authorization': 'Token %s' % (token)}
-                        params = {"org":org,"bucket": bucket,"precision":"s"}
-                    else:
-                        db = c.get(sect, 'db')
-                        headers = {}
-                        params = {'db':db, 'precision':'s'}
+                logging.debug("URL: %s", url)
+                logging.debug("Payload: %s", payload)
 
-                    i = 0
-                    payload = ""
-                    for zz in z[1:]:
-                        i += 1
-                        if zz!="":
-                            payload += "%s,channel=%02d value=%s %s\n" % (measurement, i, zz,t)
-                    logging.debug(payload)
-                    if version=='2':
-                        r = requests.post(url, headers=headers, params=params, data=payload)
-                    else:
-                        r = requests.post(url, params=params, data=payload)
-                    logging.debug(r.text)
+                post_to_url(session, url, data=payload)
 
-                if sect=='localsave' and c.getboolean(sect,'enabled'):
-                # LOCALSAVE
-                    ls_dir = c.get(sect, 'directory')
-                    filename = ls_dir+'/'+timestamp+'.csv'
-                    if not ls_fileopen:
-                        f = open(filename, 'wt')
-                        ls_fileopen = True
-                    if DayOfMonth != utcnow.day:
-                        DayOfMonth = utcnow.day
-                        if ls_fileopen:
-                            f.close()
-                        f = open(filename, 'wt')
-                        ls_fileopen = True
+            if 'influxdb' in c.sections() and c.getboolean('influxdb', 'enabled'):
+            #INFLUXDB
+                version = c.get('influxdb', 'version')
+                url = c.get('influxdb', 'url')
+                measurement = c.get('influxdb', 'measurement')
+                if version =='2':
+                    org = c.get('influxdb', 'org')
+                    bucket = c.get('influxdb', 'bucket')
+                    token = c.get('influxdb', 'token')
+                    headers = {'Authorization': f'Token {token}'}
+                    params = {"org":org,"bucket": bucket,"precision":"s"}
+                else:
+                    db = c.get('influxdb', 'db')
+                    headers = {}
+                    params = {'db':db, 'precision':'s'}
 
-                    f.write(timestamp+','+csv+'\n')
+                logging.debug("URL: %s", url)
+                payload = []
+                for channel in data_out:
+                    payload.append(f"{measurement},channel={channel} value={data_out[channel]} {timestamp}")
+                logging.debug("Payload: %s", payload)
+                payload_str = "\n".join(payload)
+
+                post_to_url(session, url, headers=headers, params=params, data=payload_str)
+
+            if 'localsave' in c.sections() and c.getboolean('localsave', 'enabled'):
+            # LOCALSAVE
+                if ls_day != utcnow.day:
+                    ls_day = utcnow.day
+                    ls_dir = c.get('localsave', 'directory')
+                    ls_filename = os.path.join(ls_dir, f"lcl-{timestamp}.csv")
+                    logging.debug("Localsave file: %s", ls_filename)
+                    write_header = True
+
+                csv = ",".join(map(lambda x: str(x+1), data_out.values()))
+                with open(ls_filename, "at", encoding="ascii") as f:
+                    if write_header:
+                        csv_headers = ",".join(data_out.keys())
+                        f.write(f"timestamp,{csv_headers}\n")
+                        write_header = False
+
+                    f.write(f"{timestamp},{csv}\n")
+
+            logging.debug("---")
 
 
         except KeyboardInterrupt:
-            if ls_fileopen:
-                f.close()
             logging.info("Terminating.")
             break
+
+        except requests.exceptions.ConnectionError as e:
+            logging.warning(e)
