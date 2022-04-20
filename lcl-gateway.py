@@ -89,6 +89,9 @@ if __name__ == "__main__":
         try:
             # Read one line from the source
             data_in = ser.readline()
+            now = datetime.datetime.now()
+            timestamp = now.strftime("%s")
+            
             if not data_in:
                 logging.warning("End of file reached: %s", serial_port)
                 break
@@ -101,9 +104,6 @@ if __name__ == "__main__":
 
             # Filter data by the requested channels
             data_out = { key: data_in[key] for key in data_in if key in channels }
-
-            now = datetime.datetime.now()
-            timestamp = now.strftime("%s")
 
             if 'emoncms' in c.sections() and c.getboolean('emoncms', 'enabled'):
             #EMONCMS
