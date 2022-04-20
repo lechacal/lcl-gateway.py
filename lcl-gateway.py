@@ -141,6 +141,7 @@ if __name__ == "__main__":
                 logging.debug("URL: %s", url)
                 payload = []
                 for channel in data_out:
+                    #payload.append(f"{measurement},channel={channel} value={data_out[channel]} {timestamp}")
                     payload.append(f"{measurement},channel={channel} value={data_out[channel]}")
                 logging.debug("Payload: %s", payload)
                 payload_str = "\n".join(payload)
