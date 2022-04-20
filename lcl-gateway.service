@@ -1,0 +1,14 @@
+[Unit]
+Description=lcl-gateway Service
+After=network-online.target
+ 
+[Service]
+ExecStart=/usr/local/bin/lcl-gateway.py
+WorkingDirectory=/tmp/
+StandardOutput=file:/tmp/lcl-gateway-stdout.log
+StandardError=file:/tmp/lcl-gateway-stderr.log
+Restart=always
+User=pi
+ 
+[Install]
+WantedBy=multi-user.target

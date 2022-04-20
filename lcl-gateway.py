@@ -102,8 +102,8 @@ if __name__ == "__main__":
             # Filter data by the requested channels
             data_out = { key: data_in[key] for key in data_in if key in channels }
 
-            utcnow = datetime.datetime.utcnow()
-            timestamp = utcnow.strftime("%s")
+            now = datetime.datetime.now()
+            timestamp = now.strftime("%s")
 
             if 'emoncms' in c.sections() and c.getboolean('emoncms', 'enabled'):
             #EMONCMS
@@ -141,7 +141,7 @@ if __name__ == "__main__":
                 logging.debug("URL: %s", url)
                 payload = []
                 for channel in data_out:
-                    payload.append(f"{measurement},channel={channel} value={data_out[channel]} {timestamp}")
+                    payload.append(f"{measurement},channel={channel} value={data_out[channel]}")
                 logging.debug("Payload: %s", payload)
                 payload_str = "\n".join(payload)
 
@@ -149,8 +149,8 @@ if __name__ == "__main__":
 
             if 'localsave' in c.sections() and c.getboolean('localsave', 'enabled'):
             # LOCALSAVE
-                if ls_day != utcnow.day:
-                    ls_day = utcnow.day
+                if ls_day != now.day:
+                    ls_day = now.day
                     ls_dir = c.get('localsave', 'directory')
                     ls_filename = os.path.join(ls_dir, f"lcl-{timestamp}.csv")
                     logging.debug("Localsave file: %s", ls_filename)
