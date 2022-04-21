@@ -65,7 +65,7 @@ if __name__ == "__main__":
 
     channels = c.get('system', 'channels', fallback='*')
     if channels == '*':
-        channels = channel_names.keys()
+        channels = channel_names
     else:
         channels = re.sub('\\s', '', channels)
         channels = channels.split(',')
