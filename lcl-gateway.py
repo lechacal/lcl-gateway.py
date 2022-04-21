@@ -158,7 +158,7 @@ if __name__ == "__main__":
                     logging.debug("Localsave file: %s", ls_filename)
                     write_header = True
 
-                csv = ",".join(map(lambda x: str(x+1), data_out.values()))
+                csv = ",".join(map(lambda x: str(x), data_out.values()))
                 with open(ls_filename, "at", encoding="ascii") as f:
                     if write_header:
                         csv_headers = ",".join(data_out.keys())
