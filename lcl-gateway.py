@@ -72,6 +72,7 @@ if __name__ == "__main__":
     logging.debug("Channels: %s", channels)
 
     serial_port = c.get('system', 'port')
+    baud = c.get('system', 'baud')
     if not os.path.exists(serial_port):
         logging.error('Serial port %s not found', serial_port)
         sys.exit(1)
