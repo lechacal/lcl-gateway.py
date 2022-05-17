@@ -128,6 +128,7 @@ if __name__ == "__main__":
                 version = c.get('influxdb', 'version')
                 url = c.get('influxdb', 'url')
                 measurement = c.get('influxdb', 'measurement')
+                node = c.get('influxdb', 'node')
                 if version =='2':
                     org = c.get('influxdb', 'org')
                     bucket = c.get('influxdb', 'bucket')
@@ -140,14 +141,12 @@ if __name__ == "__main__":
                     params = {'db':db, 'precision':'s'}
 
                 logging.debug("URL: %s", url)
-                payload = []
-                for channel in data_out:
-                    #payload.append(f"{measurement},channel={channel} value={data_out[channel]} {timestamp}")
-                    payload.append(f"{measurement},channel={channel} value={data_out[channel]}")
+                all_values = ",".join([f"{k}={data_out[k]}" for k in data_out])
+                #payload = f"{measurement},node={node} {all_values} {timestamp}" # Use RPi timestamp
+                payload = f"{measurement},node={node} {all_values}"
                 logging.debug("Payload: %s", payload)
-                payload_str = "\n".join(payload)
 
-                post_to_url(session, url, headers=headers, params=params, data=payload_str)
+                post_to_url(session, url, headers=headers, params=params, data=payload)
 
             if 'localsave' in c.sections() and c.getboolean('localsave', 'enabled'):
             # LOCALSAVE
