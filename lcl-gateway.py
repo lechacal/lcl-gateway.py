@@ -71,6 +71,25 @@ if __name__ == "__main__":
         channels = channels.split(',')
     logging.debug("Channels: %s", channels)
 
+    # Parse zero thresholds, e.g. P*:10 or P1:20
+    zero_thresholds = dict(zip(channels, [0]*len(channels)))    # Default is 0 for all channels
+    zt_config = c.get('system', 'zero_thresholds', fallback='*:0')
+    if zero_thresholds is not None:
+        zt_config = re.sub('\\s', '', zt_config)
+        zt_config = zt_config.split(',')
+        for zt in zt_config:
+            try:
+                zt_ch, zt_val = zt.replace(' ', '').split(':')
+                if zt_ch.endswith('*'):
+                    for ch in zero_thresholds:
+                        if ch.startswith(zt_ch[:-1]):
+                            zero_thresholds[ch] = float(zt_val)
+                else:
+                    zero_thresholds[zt_ch] = float(zt_val)
+            except Exception as ex:
+                logging.warning('Invalid zero_threshold entry: %s (%s)', zt, ex)
+    logging.debug("Zero thresholds: %s", zero_thresholds)
+
     serial_port = c.get('system', 'port')
     baud = c.get('system', 'baud')
     if not os.path.exists(serial_port):
@@ -105,6 +124,12 @@ if __name__ == "__main__":
 
             # Filter data by the requested channels
             data_out = { key: data_in[key] for key in data_in if key in channels }
+
+            # Filter near-zero noise
+            data_out = {
+                    key: data_out[key] if abs(data_out[key]) > zero_thresholds.get(key, 0) else 0
+                    for key in data_out
+            }
 
             if 'emoncms' in c.sections() and c.getboolean('emoncms', 'enabled'):
             #EMONCMS
