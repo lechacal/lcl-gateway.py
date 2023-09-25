@@ -15,6 +15,8 @@ import configparser
 import serial
 import requests
 
+from tinyflux import TinyFlux, Point
+
 HTTP_TIMEOUT=5
 
 def post_to_url(session, *args, **kwargs):
@@ -104,6 +106,10 @@ if __name__ == "__main__":
 
     # Rotate 'localsave' files every day
     ls_day = None
+    
+    # Open the tinyflux db if enabled
+    if 'tinyfluxdb' in c.sections() and c.getboolean('tinyfluxdb', 'enabled'):
+    	tinyfluxdb = TinyFlux(c.get('tinyfluxdb', 'database_name'))
 
     while True:
         try:
@@ -190,12 +196,23 @@ if __name__ == "__main__":
                         write_header = False
 
                     f.write(f"{timestamp},{csv}\n")
+                    
+            if 'tinyfluxdb' in c.sections() and c.getboolean('tinyfluxdb', 'enabled'):
+            # TINYFLUX
+            	p = Point(
+            		time=now,
+            		tags={"device": c.get('tinyfluxdb', 'tag')},
+            		fields = data_out
+            		)
+            	tinyfluxdb.insert(p) 
 
             logging.debug("---")
 
 
         except KeyboardInterrupt:
             logging.info("Terminating.")
+            if 'tinyfluxdb' in c.sections() and c.getboolean('tinyfluxdb', 'enabled'):
+            	tinyfluxdb.close()
             break
 
         except requests.exceptions.ConnectionError as e:
