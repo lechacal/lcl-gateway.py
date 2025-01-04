@@ -15,7 +15,7 @@ import configparser
 import serial
 import requests
 
-from tinyflux import TinyFlux, Point
+#from tinyflux import TinyFlux, Point
 
 HTTP_TIMEOUT=5
 
@@ -108,8 +108,8 @@ if __name__ == "__main__":
     ls_day = None
     
     # Open the tinyflux db if enabled
-    if 'tinyfluxdb' in c.sections() and c.getboolean('tinyfluxdb', 'enabled'):
-    	tinyfluxdb = TinyFlux(c.get('tinyfluxdb', 'database_name'))
+    #if 'tinyfluxdb' in c.sections() and c.getboolean('tinyfluxdb', 'enabled'):
+    #	tinyfluxdb = TinyFlux(c.get('tinyfluxdb', 'database_name'))
 
     while True:
         try:
@@ -197,22 +197,22 @@ if __name__ == "__main__":
 
                     f.write(f"{timestamp},{csv}\n")
                     
-            if 'tinyfluxdb' in c.sections() and c.getboolean('tinyfluxdb', 'enabled'):
+            #if 'tinyfluxdb' in c.sections() and c.getboolean('tinyfluxdb', 'enabled'):
             # TINYFLUX
-            	p = Point(
-            		time=now,
-            		tags={"device": c.get('tinyfluxdb', 'tag')},
-            		fields = data_out
-            		)
-            	tinyfluxdb.insert(p) 
+            #	p = Point(
+            #		time=now,
+            #		tags={"device": c.get('tinyfluxdb', 'tag')},
+            #		fields = data_out
+            #		)
+            #	tinyfluxdb.insert(p) 
 
             logging.debug("---")
 
 
         except KeyboardInterrupt:
             logging.info("Terminating.")
-            if 'tinyfluxdb' in c.sections() and c.getboolean('tinyfluxdb', 'enabled'):
-            	tinyfluxdb.close()
+            #if 'tinyfluxdb' in c.sections() and c.getboolean('tinyfluxdb', 'enabled'):
+            #	tinyfluxdb.close()
             break
 
         except requests.exceptions.ConnectionError as e:
