@@ -72,6 +72,8 @@ if __name__ == "__main__":
         channels = re.sub('\\s', '', channels)
         channels = channels.split(',')
     logging.debug("Channels: %s", channels)
+    
+    nan_replace = c.get('system', 'nan_replace')
 
     # Parse zero thresholds, e.g. P*:10 or P1:20
     zero_thresholds = dict(zip(channels, [0]*len(channels)))    # Default is 0 for all channels
@@ -125,7 +127,7 @@ if __name__ == "__main__":
 
             # Parse the data - create a "dict" from channel names and the values
             data_in = data_in.decode('ascii').strip().split(' ')
-            data_in = map(float, data_in)
+            #data_in = map(float, data_in)
             data_in = dict(zip(channel_names, data_in))
 
             # Filter data by the requested channels
@@ -133,9 +135,14 @@ if __name__ == "__main__":
 
             # Filter near-zero noise
             data_out = {
-                    key: data_out[key] if abs(data_out[key]) > zero_thresholds.get(key, 0) else 0
+                    key: data_out[key] if (abs(float(data_out[key])) > zero_thresholds.get(key, 0) or data_out[key]=='nan') else '0.0'
                     for key in data_out
             }
+            
+            # Replace nan with nan_replace
+            data_out = { key: data_out[key] if (data_out[key] != 'nan') else nan_replace for key in data_out}
+            
+            logging.debug("DataOut: %s", data_out)
 
             if 'emoncms' in c.sections() and c.getboolean('emoncms', 'enabled'):
             #EMONCMS
